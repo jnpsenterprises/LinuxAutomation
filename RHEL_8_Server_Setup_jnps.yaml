@@ -38,7 +38,7 @@
       ignore_errors: yes  # Continue even if the interface doesn't exist
 
     - name: Check if ens192 has an IP
-      command:
+      shell:
         cmd: nmcli device show ens192 | grep IP4.ADDRESS
       register: ens192_ip
       ignore_errors: true
