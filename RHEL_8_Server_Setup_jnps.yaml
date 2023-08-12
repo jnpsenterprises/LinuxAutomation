@@ -1,0 +1,80 @@
+---
+- name: Configure Network and Check Connectivity on RedHat
+  hosts: all
+  become: yes  # Give us elevated privileges
+
+  tasks:
+    # Check if the system is registered with Red Hat
+    - name: Check Red Hat Subscription
+      command:
+        cmd: subscription-manager identity
+      register: rh_subscription
+      ignore_errors: yes
+
+    # Ensure nmcli is installed
+    - name: Check if nmcli is installed
+      command:
+        cmd: which nmcli
+      register: nmcli_check
+      ignore_errors: yes
+
+    - name: Install NetworkManager and nmcli if not present
+      yum:
+        name: NetworkManager
+        state: latest
+      when: nmcli_check.rc != 0
+
+    # Start and enable NetworkManager service
+    - name: Ensure NetworkManager service is running and enabled
+      service:
+        name: NetworkManager
+        state: started
+        enabled: yes
+
+    # 1. Create a new interface named eth1 and set IPv4 and IPv6 addresses to DHCP
+    - name: Set IPv4 and IPv6 to DHCP on eth1
+      nmcli:
+        conn_name: eth1
+        ifname: eth1
+        type: ethernet
+        state: present
+        ip4: 'dhcp'     # Set IPv4 to DHCP
+        ip6: 'dhcp'     # Set IPv6 to DHCP
+        gw4: ''         # Default route will be added automatically with DHCP
+        autoconnect: yes
+
+    # 2. Confirm connectivity to the internet using the new interface
+    - name: Check connectivity to the internet using eth1
+      command:
+        cmd: ping -c 4 -I eth1 8.8.8.8  # Using eth1 interface to ping
+      register: internet_ping
+      failed_when: "'64 bytes' not in internet_ping.stdout"
+
+    # 3. Delete old interface that is not named eth1
+    - name: Gather network interface facts
+      setup:
+        gather_subset: network
+      register: system_interfaces
+
+    - name: Identify old interfaces
+      set_fact:
+        old_interfaces: "{{ system_interfaces | json_query('ansible_interfaces[?(@!=`eth1` && @!=`lo`)]') }}"
+      # Assuming you also want to keep the 'lo' interface. Adjust as needed.
+
+    - name: Delete old interfaces
+      nmcli:
+        conn_name: '{{ item }}'
+        state: absent
+      loop: "{{ old_interfaces }}"
+      when: old_interfaces is defined and old_interfaces | length > 0
+
+    # 4. Check for system and package updates
+    - name: Check for system updates
+      yum:
+        name: '*'
+        state: latest
+      register: yum_upgrade
+
+    - name: Display upgrade summary
+      debug:
+        var: yum_upgrade
