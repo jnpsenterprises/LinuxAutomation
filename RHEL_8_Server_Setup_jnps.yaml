@@ -32,14 +32,10 @@
         enabled: yes
 
     # 1. Create a new interface named eth1 and set IPv4 and IPv6 addresses to DHCP
-    - name: Set IPv4 and IPv6 to DHCP on eth1
-      nmcli:
-        conn_name: eth1
-        ifname: eth1
-        type: ethernet
-        state: present
-        ip4: 'auto'     # Set IPv4 to DHCP
-        ip6: 'auto'     # Set IPv6 to DHCP
+    - name: Create eth1 connection
+      command:
+        cmd: nmcli con add type ethernet ifname eth1 con-name eth1
+
 
     # 2. Confirm connectivity to the internet using the new interface
     - name: Check connectivity to the internet using eth1
@@ -47,6 +43,20 @@
         cmd: ping -c 4 -I eth1 8.8.8.8  # Using eth1 interface to ping
       register: internet_ping
       failed_when: "'64 bytes' not in internet_ping.stdout"
+
+    - name: Set eth1 to use DHCP for IPv4
+      command:
+        cmd: nmcli con mod eth1 ipv4.method auto
+      ignore_errors: yes  # In case it's already set to DHCP
+
+    - name: Set eth1 to use DHCP for IPv6
+      command:
+        cmd: nmcli con mod eth1 ipv6.method auto
+      ignore_errors: yes  # In case it's already set to DHCP
+      
+    - name: Activate eth1 connection
+      command:
+        cmd: nmcli con up eth1
 
     # 3. Delete old interface that is not named eth1
     - name: Gather network interface facts
