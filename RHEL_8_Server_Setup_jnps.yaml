@@ -38,10 +38,8 @@
         ifname: eth1
         type: ethernet
         state: present
-        ip4: 'dhcp'     # Set IPv4 to DHCP
-        ip6: 'dhcp'     # Set IPv6 to DHCP
-        gw4: ''         # Default route will be added automatically with DHCP
-        autoconnect: yes
+        ip4: 'auto'     # Set IPv4 to DHCP
+        ip6: 'auto'     # Set IPv6 to DHCP
 
     # 2. Confirm connectivity to the internet using the new interface
     - name: Check connectivity to the internet using eth1
