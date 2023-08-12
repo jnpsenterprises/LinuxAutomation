@@ -31,53 +31,40 @@
         state: started
         enabled: yes
 
-    # 1. Create a new interface named eth1 and set IPv4 and IPv6 addresses to DHCP
-    - name: Create eth1 connection
+    - name: Gather information about ens192
       command:
-        cmd: nmcli con add type ethernet ifname eth1 con-name eth1
+        cmd: nmcli con show ens192
+      register: ens192_info
+      ignore_errors: yes  # Continue even if the interface doesn't exist
 
-    # 2. Confirm connectivity to the internet using the new interface
-    - name: Set eth1 to use DHCP for IPv4
+    - name: Check if ens192 has an IP
       command:
-        cmd: nmcli con mod eth1 ipv4.method auto
-      ignore_errors: yes  # In case it's already set to DHCP
+        cmd: nmcli device show ens192 | grep IP4.ADDRESS
+      register: ens192_ip
+      ignore_errors: true
 
-    - name: Set eth1 to use DHCP for IPv6
+    - name: Create ens192 connection
       command:
-        cmd: nmcli con mod eth1 ipv6.method auto
-      ignore_errors: yes  # In case it's already set to DHCP
-      
-    - name: Activate eth1 connection
+        cmd: nmcli con add type ethernet ifname ens192 con-name ens192
+      when: 
+        - "'connection.id: ens192' not in ens192_info.stdout"
+        - "'ipv4.method: auto' not in ens192_info.stdout"
+        - ens192_ip.stdout == ""
+
+    - name: Set ens192 to use DHCP for IPv4
       command:
-        cmd: nmcli con up eth1
+        cmd: nmcli con mod ens192 ipv4.method auto
+      when: "'ipv4.method: auto' not in ens192_info.stdout"
 
-    - name: Wait a few seconds for the interface to be fully ready
-      wait_for:
-        timeout: 10  # waits for 10 seconds
-
-    - name: Check connectivity to the internet using eth1
+    - name: Set ens192 to use DHCP for IPv6
       command:
-        cmd: ping -c 4 -I eth1 8.8.8.8  # Using eth1 interface to ping
-      register: internet_ping
-      failed_when: "'64 bytes' not in internet_ping.stdout"
+        cmd: nmcli con mod ens192 ipv6.method auto
+      when: "'ipv6.method: auto' not in ens192_info.stdout"
 
-    # 3. Delete old interface that is not named eth1
-    - name: Gather network interface facts
-      setup:
-        gather_subset: network
-      register: system_interfaces
-
-    - name: Identify old interfaces
-      set_fact:
-        old_interfaces: "{{ system_interfaces | json_query('ansible_interfaces[?(@!=`eth1` && @!=`lo`)]') }}"
-      # Assuming you also want to keep the 'lo' interface. Adjust as needed.
-
-    - name: Delete old interfaces
-      nmcli:
-        conn_name: '{{ item }}'
-        state: absent
-      loop: "{{ old_interfaces }}"
-      when: old_interfaces is defined and old_interfaces | length > 0
+    - name: Activate ens192 connection
+      command:
+        cmd: nmcli con up ens192
+      when: ens192_ip.stdout == ""
 
     # 4. Check for system and package updates
     - name: Check for system updates
