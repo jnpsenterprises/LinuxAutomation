@@ -78,7 +78,6 @@
         var: yum_upgrade
     
     #5. Setup Network
-    tasks:
     - name: Get all connection details
       command: "nmcli -t -f NAME,UUID con show"
       register: nmcli_output
