@@ -92,7 +92,7 @@
         label: "{{ item.split(':')[0] }}"
 
     - name: Check if ens224 has a UUID
-      command: "nmcli -t -f connection.id,connection.uuid con show | grep '^ens224'"
+      command: "nmcli -t -f NAME,UUID con show | grep '^ens224'"
       register: ens224_check
       changed_when: False
       ignore_errors: True
@@ -121,17 +121,6 @@
         dns6:
           - '2605:1e80:3001:201::12'
           - '2605:1e80:3001:201::13'
-
-    - name: Bring up ens224
-      command: "nmcli con up ens224"
-      register: ens224_up
-      changed_when: ens224_up.rc == 0
-
-    - name: Confirm ens224 is active
-      command: "nmcli dev status | grep ens224"
-      register: ens224_status_active
-      changed_when: False
-      failed_when: "'disconnected' in ens224_status_active.stdout"
 
     - name: Ping test for ens224
       command: "ping -c 10 -I ens224 8.8.8.8"
