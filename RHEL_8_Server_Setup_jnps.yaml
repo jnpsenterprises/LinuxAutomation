@@ -91,6 +91,11 @@
       loop_control:
         label: "{{ item.split(':')[0] }}"
 
+    - name: Fail if UUID for ens224 is not found
+      fail:
+        msg: "UUID for ens224 was not found."
+      when: ens224_uuid is not defined
+
     - name: Set static IP for ens224 using UUID
       nmcli:
         conn_name: "{{ ens224_uuid }}"
@@ -108,7 +113,7 @@
           - '2605:1e80:3001:201::13'
 
     - name: Ping test for ens224
-      command: "ping -c 10 -I ens224 8.8.8.8" # Replace 8.8.8.8 with your target IP if necessary
+      command: "ping -c 10 -I ens224 8.8.8.8"
       register: ping_result
       changed_when: False
 
