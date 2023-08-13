@@ -1,3 +1,4 @@
+# RHEL 8.8
 ---
 - name: Configure RHEL 8.8 Server
   hosts: all
