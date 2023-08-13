@@ -44,35 +44,7 @@
       debug:
         var: yum_upgrade
 
-<<<<<<< HEAD
     - name: Configure ens224 connection
-=======
-    - name: Extract UUID for ens224
-      set_fact:
-        ens224_uuid: "{{ item.split(':')[1] }}"
-      loop: "{{ nmcli_output.stdout_lines }}"
-      when: "item.split(':')[0] == 'ens224'"
-      loop_control:
-        label: "{{ item.split(':')[0] }}"
-
-    - name: Check if ens224 has a UUID
-      shell: "nmcli -t -f NAME,UUID con show | grep '^ens224'"
-      register: ens224_check
-      changed_when: False
-      ignore_errors: true
-      failed_when: false
-
-    - name: Create a connection profile for ens224 if it doesn't exist
-      command: "nmcli con add type ethernet ifname ens224"
-      when: ens224_check.rc != 0
-
-    - name: Fail if UUID for ens224 is not found
-      fail:
-        msg: "UUID for ens224 was not found."
-      when: ens224_uuid is not defined
-
-    - name: Set static IP for ens224 using UUID
->>>>>>> 825b4eaa662cad47d3a6829c995b886ef5b552eb
       nmcli:
         conn_name: "{{ ens224_uuid }}"
         type: ethernet
