@@ -4,22 +4,10 @@
   become: yes
 
   tasks:
-    - name: Check Red Hat Subscription
-      command: subscription-manager identity
-      register: rh_subscription
-      failed_when: "rh_subscription.rc != 0"
-      changed_when: false
-
-    - name: Display Subscription Information
-      debug:
-        var: rh_subscription
-
-
     - name: Install NetworkManager if not present
       package:
         name: NetworkManager
         state: latest
-      when: rh_subscription.rc == 0
 
     - name: Ensure NetworkManager service is running and enabled
       service:
