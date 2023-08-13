@@ -17,18 +17,6 @@
       changed_when: false
       ignore_errors: true
 
-    - name: Check if NetworkManager is installed
-      yum:
-        list: NetworkManager
-      register: nm_state
-      changed_when: false
-
-    - name: Install NetworkManager if not present
-      package:
-        name: NetworkManager
-        state: latest
-      when: rh_subscription.rc == 0 and nm_state.results[0]['yumstate'] != 'installed'
-
     - name: Ensure NetworkManager service is running and enabled
       service:
         name: NetworkManager
