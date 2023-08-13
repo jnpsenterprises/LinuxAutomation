@@ -7,12 +7,13 @@
     - name: Check Red Hat Subscription
       command: subscription-manager identity
       register: rh_subscription
-      ignore_errors: true
+      failed_when: "rh_subscription.rc != 0"
       changed_when: false
 
     - name: Display Subscription Information
       debug:
         var: rh_subscription
+
 
     - name: Install NetworkManager if not present
       package:
