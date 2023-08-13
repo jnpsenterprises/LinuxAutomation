@@ -91,6 +91,16 @@
       loop_control:
         label: "{{ item.split(':')[0] }}"
 
+    - name: Check if ens224 has a UUID
+      command: "nmcli -t -f NAME,UUID con show | grep '^ens224'"
+      register: ens224_check
+      changed_when: False
+      ignore_errors: True
+
+    - name: Create a connection profile for ens224 if it doesn't exist
+      command: "nmcli con add type ethernet ifname ens224"
+      when: ens224_check.rc != 0
+
     - name: Fail if UUID for ens224 is not found
       fail:
         msg: "UUID for ens224 was not found."
