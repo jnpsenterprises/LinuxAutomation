@@ -55,3 +55,14 @@
     - name: Display upgrade summary
       debug:
         var: yum_upgrade
+
+    - name: Display IP information of active interface
+      command: ip addr show "{{ active_interface.stdout_lines[0].split()[4] }}"
+      register: interface_ip_info
+      changed_when: false
+      when: active_interface.rc == 0
+
+    - name: Display IP information
+      debug:
+        var: interface_ip_info.stdout_lines
+      when: interface_ip_info.stdout_lines is defined
