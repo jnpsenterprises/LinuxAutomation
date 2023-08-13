@@ -7,13 +7,13 @@
     - name: Check Red Hat Subscription
       command: subscription-manager identity
       register: rh_subscription
-      ignore_errors: yes
+      ignore_errors: true
       changed_when: false
 
     - name: Install NetworkManager if not present
       package:
         name: NetworkManager
-        state: present
+        state: latest
       when: rh_subscription.rc == 0
 
     - name: Ensure NetworkManager service is running and enabled
@@ -59,7 +59,7 @@
         var: yum_upgrade
 
     - name: Display IP information of active interface
-      command: ip addr show "{{ active_interface.results[0].split()[4] }}"
+      command: ip addr show "{{ active_interface.stdout.split()[4] }}"
       register: interface_ip_info
       changed_when: false
       when: active_interface.rc == 0
