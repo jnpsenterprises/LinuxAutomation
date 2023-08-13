@@ -77,10 +77,10 @@
       debug:
         var: yum_upgrade
 
-    - name: Configure eth1 with static IP addresses and DNS
+    - name: Configure ens10 with static IP addresses and DNS
       nmcli:
-        conn_name: ens192
-        ifname: eth1
+        conn_name: ens10
+        ifname: ens10
         type: ethernet
         ip4: '10.50.0.24/24'   # Replace with your desired IPv4 address and prefix
         gw4: '10.50.0.1'      # Replace with your desired IPv4 gateway
