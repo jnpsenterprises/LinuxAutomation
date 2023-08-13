@@ -7,12 +7,14 @@
     - name: Check Red Hat Subscription
       command: subscription-manager identity
       register: rh_subscription
-      failed_when: rh_subscription.rc != 0
+      ignore_errors: yes
+      changed_when: false
 
     - name: Install NetworkManager if not present
       package:
         name: NetworkManager
         state: present
+      when: rh_subscription.rc == 0
 
     - name: Ensure NetworkManager service is running and enabled
       service:
@@ -27,12 +29,12 @@
 
     - name: Get default gateway
       set_fact:
-        default_gateway: "{{ active_interface.stdout_lines[0].split()[2] }}"
+        default_gateway: "{{ active_interface.stdout.split()[2] }}"
       when: active_interface.rc == 0
 
     - name: Ping default gateway
       ping:
-        dest: "{{ default_gateway }}"
+        host: "{{ default_gateway }}"
       register: ping_gateway
       until: ping_gateway.ping
       retries: 3
@@ -40,7 +42,7 @@
 
     - name: Ping internet (Google DNS)
       ping:
-        dest: 8.8.8.8
+        host: 8.8.8.8
       register: ping_internet
       until: ping_internet.ping
       retries: 3
@@ -57,7 +59,7 @@
         var: yum_upgrade
 
     - name: Display IP information of active interface
-      command: ip addr show "{{ active_interface.stdout_lines[0].split()[4] }}"
+      command: ip addr show "{{ active_interface.results[0].split()[4] }}"
       register: interface_ip_info
       changed_when: false
       when: active_interface.rc == 0
