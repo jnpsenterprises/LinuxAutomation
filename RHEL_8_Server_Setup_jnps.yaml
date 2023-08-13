@@ -1,5 +1,5 @@
 ---
-- name: Configure Network and Check Connectivity on RedHat
+- name: Configure RHEL 8.8 Server
   hosts: all
   become: yes
 
@@ -7,13 +7,12 @@
     - name: Check Red Hat Subscription
       command: subscription-manager identity
       register: rh_subscription
-      ignore_errors: yes
+      failed_when: rh_subscription.rc != 0
 
-    - name: Install NetworkManager and nmcli if not present
+    - name: Install NetworkManager if not present
       package:
-        name: NetworkManager,nmcli
-        state: latest
-      when: rh_subscription.rc == 0
+        name: NetworkManager
+        state: present
 
     - name: Ensure NetworkManager service is running and enabled
       service:
@@ -21,23 +20,31 @@
         state: started
         enabled: yes
 
-    - name: Gather information about ens192
-      command: nmcli con show ens192
-      register: ens192_info
-      ignore_errors: yes
+    - name: Get active network interface
+      command: ip route get 8.8.8.8
+      register: active_interface
+      changed_when: false
 
-    - name: Configure ens192 connection
-      nmcli:
-        cmd: "{{ item }}"
-      loop:
-        - "con add type ethernet ifname ens192 con-name ens192"
-        - "con mod ens192 ipv4.method auto"
-        - "con mod ens192 ipv6.method auto"
-      when: "'connection.id: ens192' not in ens192_info.stdout or
-             'ipv4.method: auto' not in ens192_info.stdout or
-             'ipv6.method: auto' not in ens192_info.stdout"
-      vars:
-        ens192_info: "{{ lookup('pipe', 'nmcli con show ens192') }}"
+    - name: Get default gateway
+      set_fact:
+        default_gateway: "{{ active_interface.stdout_lines[0].split()[2] }}"
+      when: active_interface.rc == 0
+
+    - name: Ping default gateway
+      ping:
+        dest: "{{ default_gateway }}"
+      register: ping_gateway
+      until: ping_gateway.ping
+      retries: 3
+      delay: 5
+
+    - name: Ping internet (Google DNS)
+      ping:
+        dest: 8.8.8.8
+      register: ping_internet
+      until: ping_internet.ping
+      retries: 3
+      delay: 5
 
     - name: Check for system updates
       yum:
@@ -48,66 +55,3 @@
     - name: Display upgrade summary
       debug:
         var: yum_upgrade
-
-    - name: Get all connection details
-      shell: "nmcli -t -f NAME,UUID con show"
-      register: nmcli_output
-      changed_when: False
-
-    - name: Extract UUID for ens224
-      set_fact:
-        ens224_uuid: "{{ item.split(':')[1] }}"
-      loop: "{{ nmcli_output.stdout_lines }}"
-      when: "item.split(':')[0] == 'ens224'"
-      loop_control:
-        label: "{{ item.split(':')[0] }}"
-
-    - name: Configure ens224 connection
-      nmcli:
-        conn_name: "{{ ens224_uuid }}"
-        type: ethernet
-        state: present
-        ip4: '10.50.0.24/24'
-        gw4: '10.50.0.1'
-        ip6: '2605:1e80:3001:201::24/64'
-        gw6: '2605:1e80:3001:201::1'
-        dns4:
-          - '10.50.0.12'
-          - '10.50.0.13'
-        dns6:
-          - '2605:1e80:3001:201::12'
-          - '2605:1e80:3001:201::13'
-      when: ens224_uuid is defined
-
-    - name: Ping test for ens224
-      ping:
-        host: 8.8.8.8
-      register: ping_result
-      changed_when: False
-
-    - name: Wait for 10 seconds after successful ping
-      wait_for:
-        timeout: 10
-      when: ping_result is succeeded
-
-    - assert:
-        that:
-          - "'received, 10 received' in ping_result.stdout"
-        fail_msg: "Ping test failed, didn't receive 10 ICMP replies."
-        success_msg: "Ping test was successful with 10 ICMP replies."
-
-    - name: Shutdown ens192
-      nmcli:
-        cmd: "con down ens192"
-      register: ens192_down
-      changed_when: ens192_down.rc == 0
-
-    - name: Wait for 10 seconds after shutting down ens192
-      wait_for:
-        timeout: 10
-      when: ens192_down.changed
-
-    - name: Remove ens192
-      nmcli:
-        cmd: "con delete ens192"
-      when: ens192_down.changed
