@@ -95,7 +95,8 @@
       shell: "nmcli -t -f NAME,UUID con show | grep '^ens224'"
       register: ens224_check
       changed_when: False
-      ignore_errors: True
+      ignore_errors: true
+      failed_when: false
 
     - name: Create a connection profile for ens224 if it doesn't exist
       command: "nmcli con add type ethernet ifname ens224"
