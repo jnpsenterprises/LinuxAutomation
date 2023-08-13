@@ -92,7 +92,7 @@
         label: "{{ item.split(':')[0] }}"
 
     - name: Check if ens224 has a UUID
-      command: "nmcli -t -f NAME,UUID con show | grep '^ens224'"
+      shell: "nmcli -t -f connection.id,connection.uuid con show | grep '^ens224'"
       register: ens224_check
       changed_when: False
       ignore_errors: True
