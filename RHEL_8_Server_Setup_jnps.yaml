@@ -83,17 +83,17 @@
       register: nmcli_output
       changed_when: False
 
-    - name: Extract UUID for ens192
+    - name: Extract UUID for ens224
       set_fact:
         ens192_uuid: "{{ item.split(':')[1] }}"
       loop: "{{ nmcli_output.stdout_lines }}"
-      when: "item.split(':')[0] == 'ens192'"
+      when: "item.split(':')[0] == 'ens224'"
       loop_control:
         label: "{{ item.split(':')[0] }}"
 
-    - name: Set static IP for ens192 using UUID
+    - name: Set static IP for ens224 using UUID
       nmcli:
-        conn_name: "{{ ens192_uuid }}"
+        conn_name: "{{ ens224_uuid }}"
         type: ethernet
         state: present
         ip4: '10.50.0.24/24'
