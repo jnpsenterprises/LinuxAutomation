@@ -1,4 +1,3 @@
-# RHEL 8.8
 ---
 - name: Configure RHEL 8.8 Server
   hosts: all
@@ -15,7 +14,6 @@
       command: subscription-manager identity
       register: rh_subscription
       changed_when: false
-      ignore_errors: true
 
     - name: Ensure NetworkManager service is running and enabled
       service:
@@ -28,20 +26,29 @@
       register: active_interface
       changed_when: false
 
+    - name: Debug active_interface
+      debug:
+        var: active_interface
+      when: active_interface is defined and 'rc' in active_interface and active_interface.rc == 0
+
     - name: Get default gateway
       set_fact:
         default_gateway: "{{ active_interface.stdout.split()[2] }}"
-      when: active_interface.rc == 0 and active_interface.stdout | length > 0
+      when: active_interface is defined and 'rc' in active_interface and active_interface.rc == 0 and active_interface.stdout | length > 0
 
     - name: ICMP Ping default gateway
-      command: "ping -c 1 {{ default_gateway }}"
-      changed_when: false
-      when: active_interface.rc == 0 and active_interface.stdout | length > 0
+      wait_for:
+        host: "{{ default_gateway }}"
+        port: 80
+        timeout: 10
+      when: default_gateway is defined
 
     - name: ICMP Ping internet (Google DNS)
-      command: "ping -c 1 8.8.8.8"
-      changed_when: false
-      when: active_interface.rc == 0 and active_interface.stdout | length > 0
+      wait_for:
+        host: "8.8.8.8"
+        port: 53
+        timeout: 10
+      when: active_interface is defined and 'rc' in active_interface and active_interface.rc == 0
 
     - name: Check for system updates
       yum:
@@ -57,7 +64,7 @@
       command: ip addr show "{{ active_interface.stdout.split()[4] }}"
       register: interface_ip_info
       changed_when: false
-      when: active_interface.rc == 0 and active_interface.stdout | length > 0
+      when: active_interface is defined and 'rc' in active_interface and active_interface.rc == 0 and active_interface.stdout | length > 0
 
     - name: Display IP information
       debug:
