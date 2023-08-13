@@ -85,7 +85,7 @@
 
     - name: Extract UUID for ens224
       set_fact:
-        ens192_uuid: "{{ item.split(':')[1] }}"
+        ens224_uuid: "{{ item.split(':')[1] }}"
       loop: "{{ nmcli_output.stdout_lines }}"
       when: "item.split(':')[0] == 'ens224'"
       loop_control:
@@ -106,3 +106,39 @@
         dns6:
           - '2605:1e80:3001:201::12'
           - '2605:1e80:3001:201::13'
+
+    - name: Ping test for ens224
+      command: "ping -c 10 -I ens224 8.8.8.8" # Replace 8.8.8.8 with your target IP if necessary
+      register: ping_result
+      changed_when: False
+
+    - name: Wait for 10 seconds after successful ping
+      wait_for:
+        timeout: 10
+      when: ping_result is succeeded
+
+    - assert:
+        that:
+          - "'received, 10 received' in ping_result.stdout"
+        fail_msg: "Ping test failed, didn't receive 10 ICMP replies."
+        success_msg: "Ping test was successful with 10 ICMP replies."
+
+    - name: Shutdown ens192
+      command: "nmcli con down ens192"
+      register: ens192_down
+      changed_when: ens192_down.rc == 0
+
+    - name: Confirm ens192 is shutdown
+      command: "nmcli dev status | grep ens192"
+      register: ens192_status
+      changed_when: False
+      failed_when: "'connected' in ens192_status.stdout"
+
+    - name: Wait for 10 seconds after shutting down ens192
+      wait_for:
+        timeout: 10
+      when: ens192_down is changed
+
+    - name: Remove ens192
+      command: "nmcli con delete ens192"
+      when: ens192_down is changed and ens192_status is succeeded
