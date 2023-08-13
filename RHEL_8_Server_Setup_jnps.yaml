@@ -76,3 +76,21 @@
     - name: Display upgrade summary
       debug:
         var: yum_upgrade
+    - name: Configure eth1 with static IP addresses and DNS
+    
+  nmcli:
+    conn_name: ens192
+    ifname: eth1
+    type: ethernet
+    ip4: '10.50.0.24/24'   # Replace with your desired IPv4 address and prefix
+    gw4: '10.50.0.1'      # Replace with your desired IPv4 gateway
+    ip6: '2605:1e80:3001:201::24/64' # Replace with your desired IPv6 address and prefix
+    gw6: '2605:1e80:3001:201::1'     # Replace with your desired IPv6 gateway
+    dns4: 
+      - '10.50.0.12'            # Primary DNS server for IPv4
+      - '10.50.0.13'            # Secondary DNS server for IPv4
+    dns6:
+      - '2605:1e80:3001:201::12' # Primary DNS server for IPv6
+      - '2605:1e80:3001:201::13' # Secondary DNS server for IPv6
+    state: present
+
