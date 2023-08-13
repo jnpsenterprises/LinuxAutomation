@@ -1,72 +1,39 @@
 ---
 - name: Configure Network and Check Connectivity on RedHat
   hosts: all
-  become: yes  # Give us elevated privileges
+  become: yes
 
   tasks:
-    # Check if the system is registered with Red Hat
     - name: Check Red Hat Subscription
-      command:
-        cmd: subscription-manager identity
+      command: subscription-manager identity
       register: rh_subscription
       ignore_errors: yes
 
-    # Ensure nmcli is installed
-    - name: Check if nmcli is installed
-      command:
-        cmd: which nmcli
-      register: nmcli_check
-      ignore_errors: yes
-
     - name: Install NetworkManager and nmcli if not present
-      yum:
-        name: NetworkManager
+      package:
+        name: NetworkManager,nmcli
         state: latest
-      when: nmcli_check.rc != 0
+      when: rh_subscription.rc == 0
 
-    # Start and enable NetworkManager service
     - name: Ensure NetworkManager service is running and enabled
       service:
         name: NetworkManager
         state: started
         enabled: yes
 
-    - name: Gather information about ens192
-      command:
-        cmd: nmcli con show ens192
-      register: ens192_info
-      ignore_errors: yes  # Continue even if the interface doesn't exist
+    - name: Configure ens192 connection
+      nmcli:
+        cmd: "{{ item }}"
+      loop:
+        - "con add type ethernet ifname ens192 con-name ens192"
+        - "con mod ens192 ipv4.method auto"
+        - "con mod ens192 ipv6.method auto"
+      when: "'connection.id: ens192' not in ens192_info.stdout or
+             'ipv4.method: auto' not in ens192_info.stdout or
+             'ipv6.method: auto' not in ens192_info.stdout"
+      vars:
+        ens192_info: "{{ lookup('pipe', 'nmcli con show ens192') }}"
 
-    - name: Check if ens192 has an IP
-      shell:
-        cmd: nmcli device show ens192 | grep IP4.ADDRESS
-      register: ens192_ip
-      ignore_errors: true
-
-    - name: Create ens192 connection
-      command:
-        cmd: nmcli con add type ethernet ifname ens192 con-name ens192
-      when: 
-        - "'connection.id: ens192' not in ens192_info.stdout"
-        - "'ipv4.method: auto' not in ens192_info.stdout"
-        - ens192_ip.stdout == ""
-
-    - name: Set ens192 to use DHCP for IPv4
-      command:
-        cmd: nmcli con mod ens192 ipv4.method auto
-      when: "'ipv4.method: auto' not in ens192_info.stdout"
-
-    - name: Set ens192 to use DHCP for IPv6
-      command:
-        cmd: nmcli con mod ens192 ipv6.method auto
-      when: "'ipv6.method: auto' not in ens192_info.stdout"
-
-    - name: Activate ens192 connection
-      command:
-        cmd: nmcli con up ens192
-      when: ens192_ip.stdout == ""
-
-    # 4. Check for system and package updates
     - name: Check for system updates
       yum:
         name: '*'
@@ -76,37 +43,8 @@
     - name: Display upgrade summary
       debug:
         var: yum_upgrade
-    
-    #5. Setup Network
-    - name: Get all connection details
-      command: "nmcli -t -f NAME,UUID con show"
-      register: nmcli_output
-      changed_when: False
 
-    - name: Extract UUID for ens224
-      set_fact:
-        ens224_uuid: "{{ item.split(':')[1] }}"
-      loop: "{{ nmcli_output.stdout_lines }}"
-      when: "item.split(':')[0] == 'ens224'"
-      loop_control:
-        label: "{{ item.split(':')[0] }}"
-
-    - name: Check if ens224 has a UUID
-      shell: "nmcli -t -f NAME,UUID con show | grep '^ens224'"
-      register: ens224_check
-      changed_when: False
-      ignore_errors: True
-
-    - name: Create a connection profile for ens224 if it doesn't exist
-      command: "nmcli con add type ethernet ifname ens224"
-      when: ens224_check.rc != 0
-
-    - name: Fail if UUID for ens224 is not found
-      fail:
-        msg: "UUID for ens224 was not found."
-      when: ens224_uuid is not defined
-
-    - name: Set static IP for ens224 using UUID
+    - name: Configure ens224 connection
       nmcli:
         conn_name: "{{ ens224_uuid }}"
         type: ethernet
@@ -121,9 +59,11 @@
         dns6:
           - '2605:1e80:3001:201::12'
           - '2605:1e80:3001:201::13'
+      when: ens224_uuid is defined
 
     - name: Ping test for ens224
-      command: "ping -c 10 -I ens224 8.8.8.8"
+      ping:
+        host: 8.8.8.8
       register: ping_result
       changed_when: False
 
@@ -139,21 +79,17 @@
         success_msg: "Ping test was successful with 10 ICMP replies."
 
     - name: Shutdown ens192
-      command: "nmcli con down ens192"
+      nmcli:
+        cmd: "con down ens192"
       register: ens192_down
       changed_when: ens192_down.rc == 0
-
-    - name: Confirm ens192 is shutdown
-      command: "nmcli dev status | grep ens192"
-      register: ens192_status
-      changed_when: False
-      failed_when: "'connected' in ens192_status.stdout"
 
     - name: Wait for 10 seconds after shutting down ens192
       wait_for:
         timeout: 10
-      when: ens192_down is changed
+      when: ens192_down.changed
 
     - name: Remove ens192
-      command: "nmcli con delete ens192"
-      when: ens192_down is changed and ens192_status is succeeded
+      nmcli:
+        cmd: "con delete ens192"
+      when: ens192_down.changed
