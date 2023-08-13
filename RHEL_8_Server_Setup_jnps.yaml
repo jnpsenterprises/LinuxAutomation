@@ -4,10 +4,29 @@
   become: yes
 
   tasks:
+    - name: Validate RHEL version
+      command: cat /etc/redhat-release
+      register: rhel_version
+      changed_when: false
+      failed_when: "'Red Hat Enterprise Linux release 8.8' not in rhel_version.stdout"
+
+    - name: Check Red Hat Subscription
+      command: subscription-manager identity
+      register: rh_subscription
+      changed_when: false
+      ignore_errors: true
+
+    - name: Check if NetworkManager is installed
+      yum:
+        list: NetworkManager
+      register: nm_state
+      changed_when: false
+
     - name: Install NetworkManager if not present
       package:
         name: NetworkManager
         state: latest
+      when: rh_subscription.rc == 0 and nm_state.results[0]['yumstate'] != 'installed'
 
     - name: Ensure NetworkManager service is running and enabled
       service:
@@ -23,23 +42,17 @@
     - name: Get default gateway
       set_fact:
         default_gateway: "{{ active_interface.stdout.split()[2] }}"
-      when: active_interface.rc == 0
+      when: active_interface.rc == 0 and active_interface.stdout | length > 0
 
-    - name: Ping default gateway
-      ping:
-        host: "{{ default_gateway }}"
-      register: ping_gateway
-      until: ping_gateway.ping
-      retries: 3
-      delay: 5
+    - name: ICMP Ping default gateway
+      command: "ping -c 1 {{ default_gateway }}"
+      changed_when: false
+      when: active_interface.rc == 0 and active_interface.stdout | length > 0
 
-    - name: Ping internet (Google DNS)
-      ping:
-        host: 8.8.8.8
-      register: ping_internet
-      until: ping_internet.ping
-      retries: 3
-      delay: 5
+    - name: ICMP Ping internet (Google DNS)
+      command: "ping -c 1 8.8.8.8"
+      changed_when: false
+      when: active_interface.rc == 0 and active_interface.stdout | length > 0
 
     - name: Check for system updates
       yum:
@@ -55,9 +68,13 @@
       command: ip addr show "{{ active_interface.stdout.split()[4] }}"
       register: interface_ip_info
       changed_when: false
-      when: active_interface.rc == 0
+      when: active_interface.rc == 0 and active_interface.stdout | length > 0
 
     - name: Display IP information
       debug:
         var: interface_ip_info.stdout_lines
       when: interface_ip_info.stdout_lines is defined
+
+    - name: Restart if necessary
+      reboot:
+      when: yum_upgrade.reboot_required|default(false)
