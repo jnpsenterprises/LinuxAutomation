@@ -10,6 +10,10 @@
       ignore_errors: true
       changed_when: false
 
+    - name: Display Subscription Information
+      debug:
+        var: rh_subscription
+
     - name: Install NetworkManager if not present
       package:
         name: NetworkManager
