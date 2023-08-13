@@ -21,6 +21,11 @@
         state: started
         enabled: yes
 
+    - name: Gather information about ens192
+      command: nmcli con show ens192
+      register: ens192_info
+      ignore_errors: yes
+
     - name: Configure ens192 connection
       nmcli:
         cmd: "{{ item }}"
@@ -43,6 +48,19 @@
     - name: Display upgrade summary
       debug:
         var: yum_upgrade
+
+    - name: Get all connection details
+      shell: "nmcli -t -f NAME,UUID con show"
+      register: nmcli_output
+      changed_when: False
+
+    - name: Extract UUID for ens224
+      set_fact:
+        ens224_uuid: "{{ item.split(':')[1] }}"
+      loop: "{{ nmcli_output.stdout_lines }}"
+      when: "item.split(':')[0] == 'ens224'"
+      loop_control:
+        label: "{{ item.split(':')[0] }}"
 
     - name: Configure ens224 connection
       nmcli:
