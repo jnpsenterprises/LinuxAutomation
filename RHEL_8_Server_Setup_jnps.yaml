@@ -78,23 +78,23 @@
         var: yum_upgrade
     
     #5. Setup Network
-    - name: Get primary network interface
-      set_fact:
-        primary_interface: "{{ ansible_default_ipv4.interface }}"
-    
-    - name: Display primary interface (Optional - For debugging)
-      debug:
-        var: primary_interface
-    
-    - name: Get the UUID of the ens192 connection
-      command: "nmcli -t -f UUID,NAME con show | grep '^ens192' | cut -d: -f1"
-      register: ens192_uuid
+    tasks:
+    - name: Get all connection details
+      command: "nmcli -t -f NAME,UUID con show"
+      register: nmcli_output
       changed_when: False
-      failed_when: ens192_uuid.stdout == ""
+
+    - name: Extract UUID for ens192
+      set_fact:
+        ens192_uuid: "{{ item.split(':')[1] }}"
+      loop: "{{ nmcli_output.stdout_lines }}"
+      when: "item.split(':')[0] == 'ens192'"
+      loop_control:
+        label: "{{ item.split(':')[0] }}"
 
     - name: Set static IP for ens192 using UUID
       nmcli:
-        conn_name: "{{ ens192_uuid.stdout }}"
+        conn_name: "{{ ens192_uuid }}"
         type: ethernet
         state: present
         ip4: '10.50.0.24/24'
@@ -107,4 +107,3 @@
         dns6:
           - '2605:1e80:3001:201::12'
           - '2605:1e80:3001:201::13'
-        state: present
