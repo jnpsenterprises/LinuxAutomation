@@ -86,19 +86,25 @@
       debug:
         var: primary_interface
     
-    - name: Configure the primary interface with static IP addresses and DNS
+    - name: Get the UUID of the ens192 connection
+      command: "nmcli -t -f UUID,NAME con show | grep '^ens192' | cut -d: -f1"
+      register: ens192_uuid
+      changed_when: False
+      failed_when: ens192_uuid.stdout == ""
+
+    - name: Set static IP for ens192 using UUID
       nmcli:
-        conn_name: "{{ primary_interface }}"
-        ifname: "{{ primary_interface }}"
+        conn_name: "{{ ens192_uuid.stdout }}"
         type: ethernet
-        ip4: '10.50.0.24/24'   # Replace with your desired IPv4 address and prefix
-        gw4: '10.50.0.1'      # Replace with your desired IPv4 gateway
-        ip6: '2605:1e80:3001:201::24/64' # Replace with your desired IPv6 address and prefix
-        gw6: '2605:1e80:3001:201::1'     # Replace with your desired IPv6 gateway
-        dns4: 
-          - '10.50.0.12'            # Primary DNS server for IPv4
-          - '10.50.0.13'            # Secondary DNS server for IPv4
+        state: present
+        ip4: '10.50.0.24/24'
+        gw4: '10.50.0.1'
+        ip6: '2605:1e80:3001:201::24/64'
+        gw6: '2605:1e80:3001:201::1'
+        dns4:
+          - '10.50.0.12'
+          - '10.50.0.13'
         dns6:
-          - '2605:1e80:3001:201::12' # Primary DNS server for IPv6
-          - '2605:1e80:3001:201::13' # Secondary DNS server for IPv6
+          - '2605:1e80:3001:201::12'
+          - '2605:1e80:3001:201::13'
         state: present
